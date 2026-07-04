@@ -568,7 +568,6 @@ function ticketHtml(b){
         ${b.cover
           ? `<img class="ticket-cover" src="${b.cover}" alt="${b.name}" onerror="this.outerHTML='<div class=&quot;ticket-cover-fallback&quot;><span class=&quot;cover-title&quot;>${b.name.replace(/'/g,"&#39;")}</span></div>'">`
           : `<div class="ticket-cover-fallback"><span class="cover-title">${b.name}</span></div>`}
-        <div class="price-tag">${b.price} ₴</div>
       </div>
       <div class="ticket-body">
         <div class="ticket-top-row">
