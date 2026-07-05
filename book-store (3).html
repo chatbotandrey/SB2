@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Книжкова ятка · Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    /* ═══════════════════════════════════════════════════════════
+       НАЛАШТУВАННЯ КОЛЬОРІВ — ВСЕ КОЛЬОРИ ЗАСТОСУНКУ ЗІБРАНІ ТУТ.
+       Міняй тільки HEX-код праворуч від "--назва:" — решта коду
+       підхопить зміну одразу, по всіх сторінках і кнопках.
+       Ніде більше в CSS кольори не прописані напряму.
+    ═══════════════════════════════════════════════════════════ */
+
+    /* ── ФОН ── */
+    --page-bg:#e9e1d0;      /* фон екрану НАВКОЛО застосунку (видно на десктопі по краях) */
+    --paper:#faf5ea;        /* основний фон сторінок (шапка, футер, тло під картками) */
+    --cardbg:#ffffff;       /* фон карток товару, інпутів, кнопок-квадратів */
+
+    /* ── ТЕКСТ / ЛІНІЇ ── */
+    --ink:#2b2420;          /* основний колір тексту, товсті рамки й розділювачі */
+    --line:#e2d8c3;         /* тонкі лінії-розділювачі (між пунктами кошика і т.д.) */
+    --line-strong:#d3c6a8;  /* трохи темніша лінія для рамок карток */
+    --muted:#8a7c64;        /* приглушений текст (автор книги, підказки-плейсхолдери) */
+    --desc-text:#4a4034;    /* текст опису товару на сторінці картки */
+    --on-dark:#faf5ea;      /* текст/іконки поверх темного фону (бейдж кошика, заглушка обкладинки) */
+
+    /* ── ЦІНИ ── */
+    --accent:#c98a3e;         /* фон жовтого цінника-стікера на обкладинці */
+    --accent-ink:#3a2a12;     /* колір тексту на жовтому ціннику */
+    --price-old:#a89a7c;      /* СТАРА (закреслена) ціна — сірий */
+    --price-current:#7c2530;  /* АКТУАЛЬНА ціна під "В наявності" — глибокий бордовий */
+
+    /* ── СТАТУС НАЯВНОСТІ ── */
+    --ok:#4c6b3a;           /* текст "в наявності" (зелений) */
+    --out:#a8493f;          /* текст "немає в наявності" (червоний) */
+
+    /* ── ШТАМПИ / БЕЙДЖІ ── */
+    --stamp:#7c2530;        /* штамп "знижка / хіт продажів" на картці товару */
+    --badge-bg:#7c2530;     /* фон кружечка-лічильника товарів на іконці кошика */
+
+    /* ── ЗАГЛУШКА ОБКЛАДИНКИ (коли немає фото книги) ── */
+    --cover-fallback-1:#2b2420;  /* перший колір діагональної штрихування-заглушки */
+    --cover-fallback-2:#3a3128;  /* другий колір діагональної штрихування-заглушки */
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--page-bg);overflow-x:hidden;}
+  body{font-family:'Inter',sans-serif;color:var(--ink);display:flex;justify-content:center;
+    min-height:100vh;min-height:100dvh;}
+  button{font-family:inherit;touch-action:manipulation;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;letter-spacing:0;}
+  img{max-width:100%;}
+
+  /* ── FRAME ── */
+  .frame{
+    width:100%;max-width:480px;min-height:100vh;min-height:100dvh;
+    background:var(--paper);position:relative;
+    display:flex;flex-direction:column;
+    border-left:1px solid var(--line-strong);border-right:1px solid var(--line-strong);
+    overflow-x:hidden;
+  }
+  .screen{display:none;flex:1;flex-direction:column;min-height:0;}
+  .screen.active{display:flex;}
+
+  /* ── TOP BAR ── */
+  .topbar{
+    padding:20px 20px 16px;border-bottom:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    flex-shrink:0;background:var(--paper);
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .brand-eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+  .brand-title{font-size:clamp(20px,6vw,27px);line-height:1.1;margin:0;
+    overflow-wrap:break-word;}
+  .cart-btn{
+    position:relative;width:44px;height:44px;min-width:44px;border:1px solid var(--line-strong);border-radius:12px;
+    background:var(--cardbg);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;flex-shrink:0;box-shadow:0 2px 6px rgba(43,36,32,.06);
+  }
+  .cart-btn svg{width:20px;height:20px;}
+  .cart-badge{
+    position:absolute;top:-8px;right:-8px;background:var(--badge-bg);color:var(--on-dark);
+    font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:50%;
+    display:none;align-items:center;justify-content:center;padding:0 3px;
+    border:2px solid var(--paper);
+  }
+
+  /* ── STRIP ── */
+  .strip{
+    display:flex;flex-wrap:wrap;gap:4px 16px;padding:10px 20px;
+    background:var(--ink);color:var(--paper);flex-shrink:0;
+  }
+  .strip span{font-size:10.5px;white-space:normal;word-break:break-word;}
+
+  /* ── SEARCH ── */
+  .search-wrap{padding:16px 20px 4px;flex-shrink:0;}
+  .search{
+    display:flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:12px;
+    background:var(--cardbg);padding:11px 14px;box-shadow:0 2px 6px rgba(43,36,32,.05);
+  }
+  .search svg{width:16px;height:16px;flex-shrink:0;opacity:.55;}
+  .search input{border:none;outline:none;background:transparent;font-family:inherit;
+    font-size:13.5px;color:var(--ink);width:100%;}
+
+  .section-label{display:flex;align-items:baseline;justify-content:space-between;
+    padding:18px 20px 8px;flex-shrink:0;}
+  .section-label h2{font-size:20px;margin:0;}
+  .section-label span{font-size:11px;color:var(--muted);}
+
+  .scroll-area{flex:1;overflow-y:auto;min-height:0;}
+
+  /* ── CATALOG: TICKET LIST ── */
+  .list{display:flex;flex-direction:column;gap:14px;padding:0 20px 20px;}
+  .ticket{
+    display:flex;gap:0;border:1px solid var(--line-strong);border-radius:16px;background:var(--cardbg);
+    cursor:pointer;box-shadow:0 4px 16px rgba(43,36,32,.07);overflow:hidden;
+    transition:box-shadow .2s,transform .2s;
+  }
+  .ticket:active{box-shadow:0 2px 8px rgba(43,36,32,.09);transform:scale(.99);}
+  .ticket-cover-wrap{position:relative;width:clamp(78px,26vw,100px);flex-shrink:0;
+    align-self:stretch;overflow:hidden;}
+  .ticket-cover{width:100%;height:100%;min-height:120px;aspect-ratio:5/7;object-fit:cover;display:block;background:var(--line);}
+  .ticket-cover-fallback{width:100%;height:100%;min-height:120px;aspect-ratio:5/7;display:flex;align-items:center;justify-content:center;
+    padding:8px;text-align:center;background:repeating-linear-gradient(45deg,var(--cover-fallback-1),var(--cover-fallback-1) 6px,var(--cover-fallback-2) 6px,var(--cover-fallback-2) 12px);}
+  .cover-title{font-family:'Fraunces',serif;font-size:12px;line-height:1.25;color:var(--on-dark);}
+  .price-tag{
+    position:absolute;top:8px;right:0;background:var(--accent);color:var(--accent-ink);
+    border-radius:8px 0 0 8px;padding:4px 10px 4px 12px;font-weight:700;font-size:12px;
+    box-shadow:0 2px 6px rgba(43,36,32,.18);white-space:nowrap;z-index:2;
+  }
+  .ticket-body{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;}
+  .ticket-name{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(13px,3.6vw,15px);line-height:1.3;margin:0 0 4px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;overflow-wrap:break-word;word-break:break-word;min-width:0;}
+  .ticket-author{font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word;word-break:break-word;min-width:0;}
+  .stamp{
+    flex-shrink:0;background:var(--stamp);color:var(--on-dark);
+    font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    padding:3px 8px;border-radius:999px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  }
+  .ticket-stock-row{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;margin:0 0 10px;}
+  .ticket-stock{font-size:10.5px;font-weight:600;display:flex;align-items:center;gap:4px;margin:0;
+    min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ticket-stock::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+  .ticket-stock.yes{color:var(--ok);}
+  .ticket-stock.no{color:var(--out);}
+  .ticket-price-row{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;}
+  .ticket-old{font-size:11px;color:var(--price-old);text-decoration:line-through;}
+  .ticket-price-current{font-family:'Fraunces',serif;font-weight:600;font-size:18px;color:var(--price-current);
+    letter-spacing:.01em;line-height:1.2;white-space:nowrap;}
+  .ticket-bottom{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .add-btn{
+    background:var(--ink);color:var(--paper);border:none;border-radius:9px;font-size:11px;font-weight:600;
+    padding:9px 14px;cursor:pointer;letter-spacing:.02em;white-space:nowrap;flex-shrink:0;margin-left:auto;
+  }
+  .add-btn.disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
+  .reserve-btn{
+    background:transparent;color:var(--price-current);border:1.5px solid var(--price-current);
+    border-radius:9px;font-size:11px;font-weight:600;padding:8px 13px;cursor:pointer;
+    letter-spacing:.02em;white-space:nowrap;flex-shrink:0;margin-left:auto;font-family:inherit;
+  }
+  .reserve-btn.cancel{border-color:var(--out);color:var(--out);}
+
+  /* ── CABINET ── */
+  .cabinet-section{border-bottom:1px solid var(--line);}
+  .cabinet-section:last-child{border-bottom:none;}
+  .cabinet-section-head{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 20px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+  .cabinet-section-head h3{font-family:'Fraunces',serif;font-size:17px;margin:0;color:var(--ink);}
+  .cabinet-section-head .chevron{transition:transform .25s ease;color:var(--muted);flex-shrink:0;}
+  .cabinet-section.collapsed .chevron{transform:rotate(-90deg);}
+  .cabinet-section-body{overflow:hidden;max-height:3000px;transition:max-height .3s ease;padding:0 20px 18px;}
+  .cabinet-section.collapsed .cabinet-section-body{max-height:0;padding-top:0;padding-bottom:0;}
+  .cabinet-empty{font-size:13px;color:var(--muted);padding:0 0 4px;line-height:1.65;}
+  .cabinet-item{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);}
+  .cabinet-item:last-child{border-bottom:none;}
+  .cabinet-thumb{width:54px;height:76px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--line);}
+  .cabinet-item-info{flex:1;min-width:0;}
+  .cabinet-item-name{font-size:14.5px;font-weight:600;margin:0 0 4px;line-height:1.35;}
+  .cabinet-item-meta{font-size:12.5px;color:var(--muted);line-height:1.4;}
+  .cabinet-item-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
+  .cabinet-status{font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;white-space:nowrap;}
+  .cabinet-status.wait{background:rgba(201,138,62,.15);color:var(--accent-ink);}
+  .cabinet-status.done{background:rgba(76,107,58,.12);color:var(--ok);}
+  .cabinet-cancel-btn{font-size:12px;font-weight:700;color:var(--out);background:var(--cardbg);
+    border:1.5px solid var(--out);border-radius:9px;padding:7px 13px;cursor:pointer;white-space:nowrap;
+    font-family:inherit;}
+  .cabinet-cancel-btn:active{background:var(--out);color:#fff;}
+  .empty-state{padding:60px 30px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6;}
+  .loader{padding:60px 30px;text-align:center;color:var(--muted);font-size:13px;}
+
+  /* ── BOTTOM BACK BAR ── */
+  .back-bar{
+    flex-shrink:0;padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    background:var(--paper);border-top:1px solid var(--line-strong);
+  }
+  .back-bar button{
+    width:100%;height:46px;background:var(--cardbg);border:1px solid var(--line-strong);border-radius:11px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    font-family:inherit;font-size:13px;font-weight:600;
+    letter-spacing:0;cursor:pointer;color:var(--ink);
+  }
+  .back-bar button:active{background:var(--line);}
+
+  /* ── DETAIL ── */
+  .detail-topbar{
+    padding:16px 20px;border-bottom:1px solid var(--line-strong);display:flex;align-items:center;flex-shrink:0;
+  }
+  .detail-topbar h1{font-size:16px;margin:0;}
+  .detail-layout{padding:20px;}
+  .detail-cover-wrap{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(43,36,32,.14);margin-bottom:18px;}
+  .detail-cover{width:100%;max-height:360px;object-fit:contain;display:block;background:var(--line);}
+  .detail-cover-fallback{width:100%;height:300px;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;
+    background:repeating-linear-gradient(45deg,var(--cover-fallback-1),var(--cover-fallback-1) 8px,var(--cover-fallback-2) 8px,var(--cover-fallback-2) 16px);}
+  .detail-top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+  .detail-top-row .detail-name{margin-bottom:0;}
+  .detail-name{font-family:'Fraunces',serif;font-weight:600;font-size:25px;line-height:1.18;margin:0 0 6px;}
+  .detail-author{font-size:13px;color:var(--muted);margin:0 0 10px;}
+  .detail-stock{font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;margin:0 0 10px;}
+  .detail-stock::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+  .detail-stock.yes{color:var(--ok);}
+  .detail-stock.no{color:var(--out);}
+  .detail-price-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 0 16px;}
+  .detail-old{font-size:14px;color:var(--price-old);text-decoration:line-through;}
+  .detail-price-current{font-family:'Fraunces',serif;font-weight:600;font-size:28px;color:var(--price-current);
+    letter-spacing:.01em;line-height:1.15;}
+  .detail-desc{font-size:13px;line-height:1.7;color:var(--desc-text);margin:0 0 20px;padding:14px 16px;
+    background:var(--cardbg);border:1px solid var(--line);border-radius:12px;}
+  .qty-row{display:flex;align-items:center;gap:0;margin-bottom:16px;border:1px solid var(--line-strong);border-radius:11px;overflow:hidden;width:fit-content;}
+  .qty-btn{width:40px;height:40px;background:var(--cardbg);border:none;border-right:1px solid var(--line-strong);
+    font-size:18px;cursor:pointer;font-family:inherit;color:var(--ink);}
+  .qty-btn:last-child{border-right:none;border-left:1px solid var(--line-strong);}
+  .qty-val{width:48px;text-align:center;font-size:15px;font-weight:700;background:var(--paper);}
+  .primary-btn{
+    width:100%;background:var(--accent);color:var(--accent-ink);border:none;border-radius:12px;
+    padding:16px;font-size:13.5px;font-weight:700;letter-spacing:.02em;
+    cursor:pointer;font-family:inherit;box-shadow:0 6px 18px rgba(201,138,62,.35);
+  }
+  .primary-btn:active{box-shadow:0 2px 8px rgba(201,138,62,.3);transform:scale(.98);}
+  .primary-btn.disabled{background:var(--line);color:var(--muted);cursor:not-allowed;box-shadow:none;}
+
+  /* ── CART ── */
+  .cart-line{display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);}
+  .cart-thumb{width:52px;height:74px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+  .cart-thumb-fallback{width:52px;height:74px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(45deg,var(--cover-fallback-1),var(--cover-fallback-1) 5px,var(--cover-fallback-2) 5px,var(--cover-fallback-2) 10px);}
+  .cart-thumb-fallback span{font-size:7.5px;color:var(--on-dark);text-align:center;padding:3px;}
+  .cl-info{flex:1;min-width:0;}
+  .cl-name{font-size:12.5px;font-weight:600;margin:0 0 2px;line-height:1.3;}
+  .cl-author{font-size:10.5px;color:var(--muted);margin:0 0 8px;}
+  .cl-row{display:flex;align-items:center;justify-content:space-between;}
+  .cl-qty{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;}
+  .cl-qty button{width:24px;height:24px;background:var(--cardbg);border:none;font-size:13px;cursor:pointer;font-family:inherit;}
+  .cl-qty span{width:26px;text-align:center;font-size:12px;font-weight:700;}
+  .cl-price{font-size:12.5px;font-weight:700;}
+  .cl-remove{font-size:10.5px;color:var(--muted);text-decoration:underline;background:none;border:none;
+    cursor:pointer;padding:0;margin-top:6px;font-family:inherit;}
+
+  .receipt-footer{padding:16px 20px;border-top:1px solid var(--line-strong);background:var(--paper);flex-shrink:0;}
+  .receipt-total{display:flex;justify-content:space-between;align-items:baseline;
+    padding-top:12px;margin-bottom:14px;border-top:1px dashed var(--line-strong);}
+  .receipt-total span:first-child{font-size:12px;letter-spacing:.02em;color:var(--muted);}
+  .receipt-total span:last-child{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
+
+  /* ── CHECKOUT FORM ── */
+  .form-wrap{padding:18px 20px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:10.5px;color:var(--muted);margin-bottom:6px;
+    font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+  .field input,.field textarea{
+    width:100%;border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;font-size:13.5px;
+    font-family:inherit;background:var(--cardbg);outline:none;color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:64px;}
+  .pay-toggle{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;}
+  .pay-opt{
+    flex:1;padding:12px 8px;text-align:center;background:var(--cardbg);cursor:pointer;
+    font-size:12.5px;font-weight:600;letter-spacing:.02em;
+  }
+  .pay-opt:first-child{border-right:1px solid var(--line-strong);}
+  .pay-opt.active{background:var(--ink);color:var(--paper);}
+
+  /* ── SUCCESS ── */
+  .success-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;}
+  .stamp-big{
+    background:var(--stamp);color:var(--on-dark);border-radius:50%;
+    width:110px;height:110px;display:flex;align-items:center;justify-content:center;
+    margin-bottom:22px;font-family:'Fraunces',serif;font-weight:600;
+    font-size:16px;line-height:1.2;padding:10px;box-shadow:0 10px 24px rgba(124,37,48,.28);
+  }
+  .success-title{font-family:'Fraunces',serif;font-weight:600;font-size:23px;margin:0 0 8px;}
+  .success-text{font-size:12.5px;color:var(--muted);margin:0 0 28px;line-height:1.7;max-width:280px;}
+
+  /* ── TOAST ── */
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--paper);padding:10px 18px;font-size:12.5px;
+    opacity:0;transition:.2s;pointer-events:none;white-space:nowrap;z-index:200;
+    border:2px solid var(--accent);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ════════════════════════════════════════
+     PAGINATION
+  ════════════════════════════════════════ */
+  .pagination{
+    display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+    padding:4px 20px 24px;flex-shrink:0;
+  }
+  .page-btn{
+    min-width:38px;height:38px;padding:0 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--cardbg);
+    font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;
+    align-items:center;justify-content:center;gap:4px;flex-shrink:0;color:var(--ink);
+  }
+  .page-btn:active{background:var(--line);}
+  .page-btn.nav{padding:0 12px;letter-spacing:.02em;font-size:11.5px;}
+  .page-btn.active{background:var(--ink);color:var(--paper);cursor:default;border-color:var(--ink);}
+  .page-btn[disabled]{opacity:.35;cursor:not-allowed;}
+  .page-btn svg{width:14px;height:14px;}
+
+  /* ════════════════════════════════════════
+     SMALL PHONES (≤380px)
+  ════════════════════════════════════════ */
+  @media(max-width:380px){
+    .topbar{padding:14px 14px 12px;}
+    .strip{padding:8px 14px;gap:3px 10px;}
+    .strip span{font-size:9.5px;}
+    .search-wrap{padding:12px 14px 4px;}
+    .section-label{padding:12px 14px 6px;}
+    .section-label h2{font-size:16.5px;}
+    .list{padding:0 14px 14px;gap:10px;}
+    .ticket-body{padding:8px 10px;}
+    .ticket-name{font-size:12px;}
+    .ticket-author{font-size:10px;}
+    .add-btn{padding:7px 9px;font-size:10px;}
+    .detail-layout{padding:14px;}
+    .detail-name{font-size:20px;}
+    .form-wrap{padding:14px;}
+    .back-bar,.receipt-footer{padding-left:14px;padding-right:14px;}
+    .pagination{padding:4px 14px 18px;}
+    .page-btn{min-width:34px;height:34px;font-size:11.5px;}
+  }
+
+  /* landscape phones: keep tap targets, avoid overly tall header */
+  @media(max-height:420px) and (orientation:landscape){
+    .topbar{padding:10px 20px;}
+    .brand-title{font-size:18px;}
+    .strip{padding:5px 20px;}
+    .detail-cover{max-height:220px;}
+  }
+
+  /* ════════════════════════════════════════
+     TABLET / DESKTOP RESPONSIVE
+  ════════════════════════════════════════ */
+  @media(min-width:700px){
+    body{align-items:flex-start;padding:24px 0;}
+    .frame{max-width:640px;min-height:calc(100vh - 48px);min-height:calc(100dvh - 48px);box-shadow:0 20px 60px rgba(43,36,32,.12);border-radius:20px;overflow:hidden;}
+    .list{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 24px;}
+    .ticket{flex-direction:column;}
+    .ticket-cover-wrap{width:100%;}
+    .ticket-cover,.ticket-cover-fallback{width:100%;height:auto;aspect-ratio:4/5;min-height:0;}
+    .topbar{padding:22px 24px 18px;}
+    .search-wrap{padding:18px 24px 4px;}
+    .section-label{padding:18px 24px 10px;}
+    .form-wrap{padding:22px 24px;}
+    .cart-line{padding:16px 24px;}
+    .receipt-footer{padding:18px 24px;}
+    .detail-layout{padding:24px;max-width:520px;margin:0 auto;}
+    .pagination{padding:4px 24px 28px;}
+  }
+  @media(min-width:1000px){
+    .frame{max-width:920px;}
+    .list{grid-template-columns:repeat(3,1fr);}
+  }
+  @media(min-width:1400px){
+    .frame{max-width:1200px;}
+    .list{grid-template-columns:repeat(4,1fr);gap:20px;padding:0 32px 32px;}
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ══════════════ HOME ══════════════ -->
+  <div class="screen active" id="screen-home">
+    <div class="topbar">
+      <div class="brand">
+        <p class="brand-eyebrow">Книжкова ятка</p>
+        <h1 class="brand-title">Каталог книг</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <div class="cart-btn" onclick="goTo('screen-cabinet')" title="Особистий кабінет">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="cart-btn" onclick="goTo('screen-cart')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <span class="cart-badge" id="cart-badge">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <span>🚚 Доставка по Україні</span>
+      <span>📚 Нові надходження щотижня</span>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="search-input" placeholder="Пошук за назвою або автором" oninput="onSearchInput()">
+      </div>
+    </div>
+
+    <div class="section-label">
+      <h2>Каталог</h2>
+      <span id="book-count">0 шт.</span>
+    </div>
+
+    <div class="scroll-area">
+      <div class="list" id="catalog-list">
+        <div class="loader">Завантаження книг…</div>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ DETAIL ══════════════ -->
+  <div class="screen" id="screen-detail">
+    <div class="detail-topbar">
+      <h1>Картка книги</h1>
+    </div>
+    <div class="scroll-area">
+      <div id="detail-content"></div>
+    </div>
+    <div class="back-bar">
+      <button onclick="goBack()">← Назад</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ CART ══════════════ -->
+  <div class="screen" id="screen-cart">
+    <div class="detail-topbar">
+      <h1>Кошик</h1>
+    </div>
+    <div class="scroll-area" id="cart-list"></div>
+    <div class="receipt-footer" id="cart-footer" style="display:none;">
+      <div class="receipt-total"><span>Разом</span><span id="cart-total">0 ₴</span></div>
+      <button class="primary-btn" onclick="goTo('screen-checkout')">Оформити замовлення</button>
+    </div>
+    <div class="back-bar">
+      <button onclick="goBack()">← Назад</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ CABINET ══════════════ -->
+  <div class="screen" id="screen-cabinet">
+    <div class="detail-topbar">
+      <h1>Особистий кабінет</h1>
+    </div>
+    <div class="scroll-area" id="cabinet-content"></div>
+    <div class="back-bar">
+      <button onclick="goBack()">← Назад</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ CHECKOUT ══════════════ -->
+  <div class="screen" id="screen-checkout">
+    <div class="detail-topbar">
+      <h1>Оформлення</h1>
+    </div>
+    <div class="scroll-area">
+      <div class="form-wrap">
+        <div class="field">
+          <label>Ім'я та прізвище</label>
+          <input type="text" id="f-name" placeholder="Андрій Коваленко">
+        </div>
+        <div class="field">
+          <label>Телефон</label>
+          <input type="tel" id="f-phone" placeholder="+380 ...">
+        </div>
+        <div class="field">
+          <label>Адреса доставки</label>
+          <textarea id="f-address" placeholder="Місто, відділення Нової пошти або адреса"></textarea>
+        </div>
+        <div class="field">
+          <label>Спосіб оплати</label>
+          <div class="pay-toggle">
+            <div class="pay-opt active" id="pay-cash" onclick="setPayment('Готівкою')">Готівкою</div>
+            <div class="pay-opt" id="pay-card" onclick="setPayment('Карткою')">Карткою</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="receipt-footer">
+      <div class="receipt-total"><span>До сплати</span><span id="checkout-total">0 ₴</span></div>
+      <button class="primary-btn" id="submit-order-btn" onclick="submitOrder()">Підтвердити замовлення</button>
+      <div style="height:10px;"></div>
+      <button onclick="goBack()" style="width:100%;height:44px;background:var(--cardbg);border:1px solid var(--line-strong);border-radius:11px;
+        font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);">← Назад</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ SUCCESS ══════════════ -->
+  <div class="screen" id="screen-success">
+    <div class="success-wrap">
+      <div class="stamp-big">Прийнято</div>
+      <h2 class="success-title">Замовлення оформлено</h2>
+      <p class="success-text">Дякуємо! Менеджер зв'яжеться з вами найближчим часом, щоб підтвердити замовлення.</p>
+      <button class="primary-btn" style="max-width:260px;" onclick="backToShopping()">До каталогу</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   BOOKS API
+   Замінюй тільки значення API_URL — решта коду
+   підлаштовується автоматично.
+══════════════════════════════════════════ */
+const API_URL = "https://script.google.com/macros/s/AKfycbz0C2gktuOkvCXPH5MKxTX0gfsorDwMEy2ZgLOp_n8t7kQ0K7iOINJDZcBKW2OIuMnJ/exec";
+
+/* Скільки хвилин тримати кеш каталогу в localStorage,
+   щоб застосунок відкривався миттєво, а не чекав відповідь Google Apps Script */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+let BOOKS = [];
+let cart = JSON.parse(localStorage.getItem("stall_cart")||"{}");
+/* reservedIds — ID заброньованих книг поточного користувача.
+   Спочатку беремо локальний кеш (щоб одразу щось показати),
+   а після завантаження застосунку звіряємо з таблицею "Бронювання"
+   через syncMyReservations() — тому скасування чи зміна статусу
+   бронювання прямо в таблиці одразу відображається і в застосунку. */
+let reservedIds = new Set(JSON.parse(localStorage.getItem("stall_reserved_ids")||"[]"));
+let myOrders = JSON.parse(localStorage.getItem("stall_orders")||"[]");
+let selectedPayment = "Готівкою";
+let tg = window.Telegram ? window.Telegram.WebApp : null;
+if(tg){ tg.ready(); tg.expand(); }
+registerSubscriber();
+
+/* Один раз повідомляємо бекенду про користувача — щоб він потрапив у
+   список підписників і отримував розсилки про нові надходження книг. */
+async function registerSubscriber(){
+  if(!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) return;
+  if(localStorage.getItem("stall_registered")) return;
+  const u=tg.initDataUnsafe.user;
+  try{
+    if(API_URL && !API_URL.includes("ВСТАВ_СЮДИ")){
+      await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({
+        action:"register",
+        telegramId:u.id,
+        telegram:u.username||u.first_name||""
+      })});
+    }
+    localStorage.setItem("stall_registered","1");
+  }catch(e){ console.error(e); }
+}
+
+function saveCart(){ localStorage.setItem("stall_cart",JSON.stringify(cart)); updateCartBadge(); }
+function saveReservedIds(){ localStorage.setItem("stall_reserved_ids",JSON.stringify([...reservedIds])); }
+function isReserved(id){ return reservedIds.has(id); }
+function currentTgUser(){ return tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user:null; }
+
+/* Звіряємо локальний список броней з таблицею "Бронювання" на сервері.
+   Викликається одразу після завантаження каталогу — тому якщо хтось
+   вручну змінив статус брони в таблиці (скасував, або позначив
+   "Сповіщено"), застосунок покаже це вже під час наступного відкриття. */
+async function syncMyReservations(){
+  const tgUser=currentTgUser();
+  if(!tgUser || !API_URL || API_URL.includes("ВСТАВ_СЮДИ")) return;
+  try{
+    const res=await fetch(`${API_URL}?action=cabinet&telegramId=${encodeURIComponent(tgUser.id)}`);
+    const data=await res.json();
+    const activeIds=(data.reservations||[])
+      .filter(r=>r["Статус"]==="Очікує")
+      .map(r=>String(r["ID книги"]||""));
+    reservedIds=new Set(activeIds);
+    saveReservedIds();
+    renderCatalog();
+  }catch(e){ console.error("syncMyReservations error:",e); }
+}
+
+async function reserveBook(id){
+  const b=BOOKS.find(x=>x.id===id);
+  if(!b || isReserved(id)) return;
+  reservedIds.add(id);
+  saveReservedIds();
+  showToast("Заброньовано! Повідомимо, коли книга з'явиться", 4600);
+  renderCatalog();
+
+  const tgUser=currentTgUser();
+  const payload={
+    action:"reserve",
+    bookId:id, bookName:b.name,
+    telegram:tgUser?(tgUser.username||tgUser.first_name):"",
+    telegramId:tgUser?tgUser.id:"",
+    date:formatDateTime()
+  };
+  try{
+    if(API_URL && !API_URL.includes("ВСТАВ_СЮДИ")){
+      await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    }else{
+      console.log("ДЕМО-режим, бронювання:",payload);
+    }
+  }catch(e){ console.error(e); }
+}
+
+/* Скасування брони — доступно з картки в каталозі і зі сторінки товару.
+   Оптимістично прибираємо позначку одразу в інтерфейсі, а бекенду
+   надсилаємо action:"cancelReserve" (він вже вміє це обробляти —
+   переводить рядок у таблиці "Бронювання" в статус "Скасовано"). */
+async function cancelReservation(id){
+  if(!isReserved(id)) return;
+  reservedIds.delete(id);
+  saveReservedIds();
+  showToast("Бронь скасовано");
+  renderCatalog();
+
+  const tgUser=currentTgUser();
+  const payload={
+    action:"cancelReserve",
+    bookId:id,
+    telegram:tgUser?(tgUser.username||tgUser.first_name):"",
+    telegramId:tgUser?tgUser.id:""
+  };
+  try{
+    if(API_URL && !API_URL.includes("ВСТАВ_СЮДИ")){
+      await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    }else{
+      console.log("ДЕМО-режим, скасування броні:",payload);
+    }
+  }catch(e){ console.error(e); }
+
+  // Оновлюємо кабінет ЛИШЕ після того, як скасування дійшло до сервера —
+  // інакше повторний запит до таблиці ще застане старий статус "Очікує"
+  // і бронь на мить "повернеться" в списку.
+  const cabinetScreen=document.getElementById('screen-cabinet');
+  if(cabinetScreen && cabinetScreen.classList.contains('active')) renderCabinet(false);
+}
+
+function showToast(msg,duration=1600){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt=setTimeout(()=>t.classList.remove('show'),duration);
+}
+
+function applyScreen(screenId){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(screenId);
+  if(!el) return;
+  el.classList.add('active');
+  if(screenId==='screen-cart') renderCart();
+  if(screenId==='screen-checkout') renderCheckoutTotal();
+  if(screenId==='screen-cabinet') renderCabinet();
+  window.scrollTo(0,0);
+  if(tg && tg.BackButton){
+    if(screenId==='screen-home') tg.BackButton.hide();
+    else tg.BackButton.show();
+  }
+}
+
+function goTo(screenId){
+  applyScreen(screenId);
+  history.pushState({screen:screenId},'','#'+screenId);
+}
+function goBack(){ history.back(); }
+window.addEventListener('popstate',function(e){
+  const screenId=(e.state && e.state.screen) || 'screen-home';
+  applyScreen(screenId);
+});
+window.addEventListener('DOMContentLoaded',function(){
+  history.replaceState({screen:'screen-home'},'','#screen-home');
+});
+if(typeof tg!=='undefined' && tg && tg.BackButton){
+  tg.BackButton.onClick(function(){ goBack(); });
+}
+
+function formatDateTime(d){
+  d=d||new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const day=pad(d.getDate());
+  const month=pad(d.getMonth()+1);
+  const year=d.getFullYear();
+  const hours=pad(d.getHours());
+  const minutes=pad(d.getMinutes());
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
+}
+
+function toDirectImageUrl(url){
+  if(!url) return "";
+  const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m && url.includes("drive.google.com"))
+    return `https://lh3.googleusercontent.com/d/${m[1]}=w1000`;
+  return url;
+}
+
+/* ── Побудова однієї книги з "сирого" рядка таблиці ──
+   ВАЖЛИВО (виправлення плутанини цін):
+   у таблиці колонка "Ціна" — це звичайна ціна книги,
+   а "Знижка" — це ціна ЗІ ЗНИЖКОЮ (менша за звичайну), якщо вона задана.
+   Тому:
+     - якщо "Знижка" заповнена і вона МЕНША за "Ціна" → показуємо
+       "Знижка" як актуальну (велику) ціну, а "Ціна" — закресленою зверху;
+     - якщо "Знижка" порожня або не менша за "Ціна" → знижки немає,
+       показуємо просто "Ціна" без закресленої ціни. */
+function buildBook(b){
+  const regularPrice = Number(b.price!==undefined?b.price:b.Ціна) || 0;
+  const discountPrice = Number(b.oldPrice!==undefined?b.oldPrice:b["Знижка"]) || 0;
+  const hasDiscount = discountPrice>0 && discountPrice<regularPrice;
+  return {
+    id:String(b.id||b.ID||b.Id),
+    name:b.name||b.Назва||"",
+    author:b.author||b.Автор||"",
+    price: hasDiscount ? discountPrice : regularPrice,
+    oldPrice: hasDiscount ? regularPrice : "",
+    category:b.category||b.Жанр||"Інше",
+    cover:toDirectImageUrl(b.cover||b.Обкладинка||""),
+    badge:b.badge||b.Статус||"",
+    description:b.description||b.Опис||"",
+    stock:Number(b.stock!==undefined?b.stock:(b.Наявність!==undefined?b.Наявність:0))||0
+  };
+}
+
+async function loadBooks(){
+  if(!API_URL||API_URL.includes("ВСТАВ_СЮДИ")){ renderCatalog(); return; }
+
+  /* 1) Миттєво показуємо те, що бачили минулого разу (якщо кеш не застарів),
+        поки свіжі дані ще їдуть з Google Apps Script — так каталог
+        відкривається без відчутної затримки. */
+  try{
+    const rawCache=localStorage.getItem("stall_books_cache");
+    if(rawCache){
+      const cache=JSON.parse(rawCache);
+      if(cache && Array.isArray(cache.books)){
+        BOOKS=cache.books;
+        renderCatalog();
+        updateCartBadge();
+      }
+    }
+  }catch(e){ /* пошкоджений кеш — ігноруємо */ }
+
+  /* 2) Паралельно тягнемо актуальні дані та оновлюємо екран і кеш */
+  try{
+    const res=await fetch(API_URL+"?action=books");
+    const data=await res.json();
+    BOOKS=data.map(buildBook).filter(b=>b.name.trim()!=="");
+    try{
+      localStorage.setItem("stall_books_cache",JSON.stringify({books:BOOKS,ts:Date.now()}));
+    }catch(e){ /* localStorage переповнений — пропускаємо кешування */ }
+  }catch(e){ console.error("loadBooks error:",e); }
+  renderCatalog();
+  updateCartBadge();
+}
+
+function ticketHtml(b){
+  const inStock=b.stock>0;
+  return `
+    <div class="ticket" onclick="openDetail('${b.id}')">
+      <div class="ticket-cover-wrap">
+        ${b.cover
+          ? `<img class="ticket-cover" src="${b.cover}" alt="${b.name}" loading="lazy" onerror="this.outerHTML='<div class=&quot;ticket-cover-fallback&quot;><span class=&quot;cover-title&quot;>${b.name.replace(/'/g,"&#39;")}</span></div>'">`
+          : `<div class="ticket-cover-fallback"><span class="cover-title">${b.name}</span></div>`}
+      </div>
+      <div class="ticket-body">
+        <p class="ticket-name">${b.name}</p>
+        <p class="ticket-author">${b.author}</p>
+        <div class="ticket-stock-row">
+          <p class="ticket-stock ${inStock?'yes':'no'}">${inStock?'В наявності':'Немає в наявності'}</p>
+          ${b.badge?`<span class="stamp">${b.badge}</span>`:''}
+        </div>
+        <div class="ticket-bottom">
+          <div class="ticket-price-row">
+            ${b.oldPrice?`<span class="ticket-old">${b.oldPrice} ₴</span>`:''}
+            <span class="ticket-price-current">${b.price} ₴</span>
+          </div>
+          ${inStock
+            ? `<button class="add-btn" onclick="event.stopPropagation();addToCart('${b.id}',1);showToast('Додано в кошик')">До кошика</button>`
+            : (isReserved(b.id)
+              ? `<button class="reserve-btn cancel" onclick="event.stopPropagation();cancelReservation('${b.id}')">Скасувати бронь</button>`
+              : `<button class="reserve-btn" onclick="event.stopPropagation();reserveBook('${b.id}')">Забронювати</button>`)}
+        </div>
+      </div>
+    </div>`;
+}
+
+const PAGE_SIZE=8;
+let currentPage=1;
+
+function onSearchInput(){
+  currentPage=1;
+  renderCatalog();
+}
+
+function getFilteredBooks(){
+  const q=(document.getElementById('search-input').value||"").toLowerCase();
+  return BOOKS.filter(b=>!q||b.name.toLowerCase().includes(q)||b.author.toLowerCase().includes(q));
+}
+
+function renderCatalog(){
+  const list=getFilteredBooks();
+  document.getElementById('book-count').textContent=list.length+" шт.";
+  const el=document.getElementById('catalog-list');
+  const pagEl=document.getElementById('pagination');
+
+  if(!list.length){
+    el.innerHTML=`<div class="empty-state">${document.getElementById('search-input').value?'Нічого не знайдено. Спробуйте інший запит.':'Каталог поки порожній. Додайте книги до таблиці.'}</div>`;
+    pagEl.innerHTML='';
+    return;
+  }
+
+  const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+  if(currentPage>totalPages) currentPage=totalPages;
+  if(currentPage<1) currentPage=1;
+
+  const start=(currentPage-1)*PAGE_SIZE;
+  const pageItems=list.slice(start,start+PAGE_SIZE);
+
+  el.innerHTML=pageItems.map(ticketHtml).join('');
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages){
+  const pagEl=document.getElementById('pagination');
+  if(totalPages<=1){ pagEl.innerHTML=''; return; }
+
+  const arrowLeft=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>`;
+  const arrowRight=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>`;
+
+  let pages=[];
+  const maxShown=5;
+  let from=Math.max(1,currentPage-Math.floor(maxShown/2));
+  let to=Math.min(totalPages,from+maxShown-1);
+  from=Math.max(1,to-maxShown+1);
+  for(let p=from;p<=to;p++) pages.push(p);
+
+  let html=`<button class="page-btn nav" ${currentPage===1?'disabled':''} onclick="goToPage(${currentPage-1})">${arrowLeft}Назад</button>`;
+  if(from>1) html+=`<button class="page-btn" onclick="goToPage(1)">1</button>${from>2?'<span style="padding:0 2px;">…</span>':''}`;
+  html+=pages.map(p=>`<button class="page-btn ${p===currentPage?'active':''}" onclick="goToPage(${p})">${p}</button>`).join('');
+  if(to<totalPages) html+=`${to<totalPages-1?'<span style="padding:0 2px;">…</span>':''}<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+  html+=`<button class="page-btn nav" ${currentPage===totalPages?'disabled':''} onclick="goToPage(${currentPage+1})">Вперед${arrowRight}</button>`;
+
+  pagEl.innerHTML=html;
+}
+
+function goToPage(p){
+  currentPage=p;
+  renderCatalog();
+  document.querySelector('#screen-home .scroll-area').scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderDetailContent(id){
+  const b=BOOKS.find(x=>x.id===id);
+  if(!b) return;
+  const qty=cart[id]||1;
+  document.getElementById('detail-content').innerHTML=`
+    <div class="detail-layout">
+      <div class="detail-cover-wrap">
+        ${b.cover
+          ? `<img class="detail-cover" src="${b.cover}" loading="lazy" onerror="this.outerHTML='<div class=&quot;detail-cover-fallback&quot;><span class=&quot;cover-title&quot; style=&quot;font-size:16px;&quot;>${b.name.replace(/'/g,"&#39;")}</span></div>'">`
+          : `<div class="detail-cover-fallback"><span class="cover-title" style="font-size:16px;">${b.name}</span></div>`}
+      </div>
+      <div class="detail-top-row">
+        <h1 class="detail-name">${b.name}</h1>
+        ${b.badge?`<span class="stamp">${b.badge}</span>`:''}
+      </div>
+      <p class="detail-author">${b.author} · ${b.category}</p>
+      <span class="detail-stock ${b.stock>0?'yes':'no'}">${b.stock>0?'В наявності':'Немає в наявності'}</span>
+      <div class="detail-price-row">
+        ${b.oldPrice?`<span class="detail-old">${b.oldPrice} ₴</span>`:''}
+        <span class="detail-price-current">${b.price} ₴</span>
+      </div>
+      <p class="detail-desc">${b.description||"Зв'яжіться з менеджером — він підкаже деталі наявності та доставки."}</p>
+      ${b.stock>0?`
+      <div class="qty-row">
+        <button class="qty-btn" onclick="changeDetailQty(-1)">−</button>
+        <span class="qty-val" id="detail-qty">${qty}</span>
+        <button class="qty-btn" onclick="changeDetailQty(1)">+</button>
+      </div>
+      <button class="primary-btn" onclick="addToCart('${id}',parseInt(document.getElementById('detail-qty').textContent));showToast('Додано в кошика');goTo('screen-home')">До кошика</button>
+      `:(isReserved(id)
+        ? `<button class="primary-btn" style="background:var(--cardbg);color:var(--out);border:1.5px solid var(--out);box-shadow:none;" onclick="cancelReservation('${id}');renderDetailContent('${id}')">Скасувати бронь</button>`
+        : `<button class="primary-btn" style="background:var(--cardbg);color:var(--price-current);border:1.5px solid var(--price-current);box-shadow:none;" onclick="reserveBook('${id}');renderDetailContent('${id}')">Забронювати — повідомимо, коли з'явиться</button>`)}
+    </div>`;
+}
+function openDetail(id){
+  renderDetailContent(id);
+  goTo('screen-detail');
+}
+
+function changeDetailQty(delta){
+  const el=document.getElementById('detail-qty');
+  let v=parseInt(el.textContent)+delta;
+  if(v<1) v=1;
+  el.textContent=v;
+}
+
+function addToCart(id,qty){
+  const b=BOOKS.find(x=>x.id===id);
+  if(b && b.stock<=0){ showToast('Немає в наявності'); return; }
+  cart[id]=(cart[id]||0)+qty;
+  saveCart();
+}
+function removeFromCart(id){ delete cart[id]; saveCart(); renderCart(); }
+function changeCartQty(id,delta){
+  cart[id]=(cart[id]||0)+delta;
+  if(cart[id]<=0) delete cart[id];
+  saveCart(); renderCart();
+}
+function cartCount(){ return Object.values(cart).reduce((a,b)=>a+b,0); }
+function cartTotal(){
+  return Object.entries(cart).reduce((sum,[id,qty])=>{
+    const b=BOOKS.find(x=>x.id===id);
+    return sum+(b?b.price*qty:0);
+  },0);
+}
+function updateCartBadge(){
+  const n=cartCount();
+  const badge=document.getElementById('cart-badge');
+  badge.textContent=n;
+  badge.style.display=n>0?'flex':'none';
+}
+
+function renderCart(){
+  const ids=Object.keys(cart);
+  const list=document.getElementById('cart-list');
+  const footer=document.getElementById('cart-footer');
+  if(!ids.length){
+    list.innerHTML=`<div class="empty-state">Кошик порожній.<br>Додайте книги з каталогу.</div>`;
+    footer.style.display='none';
+    return;
+  }
+  footer.style.display='block';
+  list.innerHTML=ids.map(id=>{
+    const b=BOOKS.find(x=>x.id===id);
+    if(!b) return '';
+    const qty=cart[id];
+    return `
+      <div class="cart-line">
+        ${b.cover
+          ? `<img class="cart-thumb" src="${b.cover}" loading="lazy" onerror="this.outerHTML='<div class=&quot;cart-thumb-fallback&quot;><span>${b.name.replace(/'/g,"&#39;")}</span></div>'">`
+          : `<div class="cart-thumb-fallback"><span>${b.name}</span></div>`}
+        <div class="cl-info">
+          <p class="cl-name">${b.name}</p>
+          <p class="cl-author">${b.author}</p>
+          <div class="cl-row">
+            <div class="cl-qty">
+              <button onclick="changeCartQty('${id}',-1)">−</button>
+              <span>${qty}</span>
+              <button onclick="changeCartQty('${id}',1)">+</button>
+            </div>
+            <span class="cl-price">${b.price*qty} ₴</span>
+          </div>
+          <button class="cl-remove" onclick="removeFromCart('${id}')">Видалити</button>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('cart-total').textContent=cartTotal()+" ₴";
+}
+
+function renderCheckoutTotal(){
+  document.getElementById('checkout-total').textContent=cartTotal()+" ₴";
+}
+
+function setPayment(val){
+  selectedPayment=val;
+  document.getElementById('pay-cash').classList.toggle('active',val==='Готівкою');
+  document.getElementById('pay-card').classList.toggle('active',val==='Карткою');
+}
+
+async function submitOrder(){
+  const name=document.getElementById('f-name').value.trim();
+  const phone=document.getElementById('f-phone').value.trim();
+  const address=document.getElementById('f-address').value.trim();
+
+  if(!name||!phone||!address){
+    showToast('Заповніть усі поля');
+    return;
+  }
+  if(!cartCount()){
+    showToast('Кошик порожній');
+    return;
+  }
+
+  const items=Object.entries(cart).map(([id,qty])=>{
+    const b=BOOKS.find(x=>x.id===id);
+    return {id,name:b?b.name:id,price:b?b.price:0,qty};
+  });
+  const tgUserObj=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user:null;
+  const tgUser=tgUserObj?(tgUserObj.username||tgUserObj.first_name):"";
+
+  const order={
+    name, phone, address,
+    payment:selectedPayment,
+    items, total:cartTotal(),
+    telegram:tgUser,
+    telegramId:tgUserObj?tgUserObj.id:"",
+    date:formatDateTime()
+  };
+
+  const btn=document.getElementById('submit-order-btn');
+  btn.disabled=true; btn.textContent="Надсилаємо…";
+
+  try{
+    if(API_URL && !API_URL.includes("ВСТАВ_СЮДИ")){
+      await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"order",...order})});
+    }else{
+      console.log("ДЕМО-режим:",order);
+    }
+    cart={}; saveCart();
+    myOrders.unshift(order);
+    localStorage.setItem("stall_orders",JSON.stringify(myOrders));
+    goTo('screen-success');
+  }catch(e){
+    console.error(e); showToast('Помилка. Спробуйте ще раз');
+  }finally{
+    btn.disabled=false; btn.textContent="Підтвердити замовлення";
+  }
+}
+
+function backToShopping(){ goTo('screen-home'); }
+
+/* ── Кабінет користувача ──
+   Історія замовлень і активні брони тепер підтягуються з сервера
+   по telegramId — тому вона однакова на телефоні, ПК і будь-якому
+   іншому пристрої, де людина заходить під тим самим Telegram-акаунтом.
+   Якщо застосунок відкрито поза Telegram (наприклад, для тесту в браузері
+   без tg.initDataUnsafe.user) — використовуємо старий локальний запис
+   як резервний варіант, щоб кабінет усе одно щось показував. */
+function cabinetSectionHtml(reservedList, ordersList){
+  const chevron=`<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>`;
+
+  let reservedHtml=`<div class="cabinet-section" id="cabinet-sec-reserved">
+    <div class="cabinet-section-head" onclick="toggleCabinetSection('cabinet-sec-reserved')">
+      <h3>📌 Заброньовані книги</h3>${chevron}
+    </div>
+    <div class="cabinet-section-body">`;
+  if(!reservedList.length){
+    reservedHtml+=`<p class="cabinet-empty">Тут з'являться книги, які зараз немає в наявності, але ви хочете їх отримати — ми напишемо, коли вони з'являться.</p>`;
+  }else{
+    reservedList.forEach(r=>{
+      const b=BOOKS.find(x=>x.id===r.id);
+      const isWaiting=(r.status||'Очікуємо')==='Очікуємо';
+      reservedHtml+=`
+        <div class="cabinet-item" data-reserve-id="${r.id}">
+          ${b&&b.cover?`<img class="cabinet-thumb" src="${b.cover}" loading="lazy">`:`<div class="cabinet-thumb"></div>`}
+          <div class="cabinet-item-info">
+            <p class="cabinet-item-name">${r.name}</p>
+            <p class="cabinet-item-meta">${b?b.author:''}</p>
+          </div>
+          <div class="cabinet-item-side">
+            <span class="cabinet-status wait">${r.status||'Очікуємо'}</span>
+            ${isWaiting?`<button class="cabinet-cancel-btn" onclick="cancelReservation('${r.id}')">✕ Скасувати</button>`:''}
+          </div>
+        </div>`;
+    });
+  }
+  reservedHtml+=`</div></div>`;
+
+  let ordersHtml=`<div class="cabinet-section" id="cabinet-sec-orders">
+    <div class="cabinet-section-head" onclick="toggleCabinetSection('cabinet-sec-orders')">
+      <h3>🧾 Мої замовлення</h3>${chevron}
+    </div>
+    <div class="cabinet-section-body">`;
+  if(!ordersList.length){
+    ordersHtml+=`<p class="cabinet-empty">Замовлення, які ви оформите, з'являться тут.</p>`;
+  }else{
+    ordersList.forEach(o=>{
+      ordersHtml+=`
+        <div class="cabinet-item">
+          <div class="cabinet-item-info">
+            <p class="cabinet-item-name">${o.itemsText}</p>
+            <p class="cabinet-item-meta">${o.date} · ${o.total} ₴</p>
+          </div>
+          <span class="cabinet-status done">Оформлено</span>
+        </div>`;
+    });
+  }
+  ordersHtml+=`</div></div>`;
+  return reservedHtml+ordersHtml;
+}
+
+function toggleCabinetSection(id){
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+async function renderCabinet(showLoader=true){
+  const wrap=document.getElementById('cabinet-content');
+  const scrollPos=wrap.scrollTop;
+  const tgUser=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user:null;
+
+  // Немає Telegram-акаунта (тест поза Telegram) — показуємо старий локальний запис
+  if(!tgUser || !API_URL || API_URL.includes("ВСТАВ_СЮДИ")){
+    const reservedList=[...reservedIds].map(id=>({id,name:(BOOKS.find(x=>x.id===id)||{}).name||id,status:'Очікуємо'}));
+    const ordersList=myOrders.map(o=>({itemsText:o.items.map(i=>`${i.name} × ${i.qty}`).join(', '),date:o.date,total:o.total}));
+    wrap.innerHTML=cabinetSectionHtml(reservedList,ordersList);
+    wrap.scrollTop=scrollPos;
+    return;
+  }
+
+  if(showLoader) wrap.innerHTML=`<div class="loader">Завантаження…</div>`;
+  try{
+    const res=await fetch(`${API_URL}?action=cabinet&telegramId=${encodeURIComponent(tgUser.id)}`);
+    const data=await res.json();
+    const reservedList=(data.reservations||[]).map(r=>({
+      id:String(r["ID книги"]||""),
+      name:r["Назва книги"]||"",
+      status:r["Статус"]==='Сповіщено'?'Вже в наявності':'Очікуємо'
+    }));
+    const ordersList=(data.orders||[]).map(o=>({
+      itemsText:o["Товари"]||"",
+      date:o["Дата"]||"",
+      total:o["Сума"]||0
+    }));
+    wrap.innerHTML=cabinetSectionHtml(reservedList,ordersList);
+    wrap.scrollTop=scrollPos;
+  }catch(e){
+    console.error("renderCabinet error:",e);
+    wrap.innerHTML=`<div class="empty-state">Не вдалося завантажити кабінет. Перевірте з'єднання і спробуйте ще раз.</div>`;
+  }
+}
+
+loadBooks();
+syncMyReservations();
+</script>
+</body>
+</html>
