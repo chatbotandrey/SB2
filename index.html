@@ -15,7 +15,6 @@
        підхопить зміну одразу, по всіх сторінках і кнопках.
        Ніде більше в CSS кольори не прописані напряму.
     ═══════════════════════════════════════════════════════════ */
-
     /* ── ФОН ── */
     --page-bg:#e9e1d0;      /* фон екрану НАВКОЛО застосунку (видно на десктопі по краях) */
     --paper:#faf5ea;        /* основний фон сторінок (шапка, футер, тло під картками) */
@@ -776,9 +775,11 @@ function ticketHtml(b){
         </div>
         <div class="ticket-bottom">
           <div class="ticket-price-row">
-            ${b.oldPrice?`<span class="ticket-old">${b.oldPrice} ₴</span>`:''}
-            <span class="ticket-price-current">${b.price} ₴</span>
-          </div>
+  ${inStock ? `
+    ${b.oldPrice?`<span class="ticket-old">${b.oldPrice} ₴</span>`:''}
+    <span class="ticket-price-current">${b.price} ₴</span>
+  ` : ''}
+</div>
           ${inStock
             ? `<button class="add-btn" onclick="event.stopPropagation();addToCart('${b.id}',1);showToast('Додано в кошик')">До кошика</button>`
             : (isReserved(b.id)
@@ -871,10 +872,12 @@ function renderDetailContent(id){
       </div>
       <p class="detail-author">${b.author} · ${b.category}</p>
       <span class="detail-stock ${b.stock>0?'yes':'no'}">${b.stock>0?'В наявності':'Немає в наявності'}</span>
-      <div class="detail-price-row">
-        ${b.oldPrice?`<span class="detail-old">${b.oldPrice} ₴</span>`:''}
-        <span class="detail-price-current">${b.price} ₴</span>
-      </div>
+      ${b.stock>0?`
+<div class="detail-price-row">
+  ${b.oldPrice?`<span class="detail-old">${b.oldPrice} ₴</span>`:''}
+  <span class="detail-price-current">${b.price} ₴</span>
+</div>
+`:''}
       <p class="detail-desc">${b.description||"Зв'яжіться з менеджером — він підкаже деталі наявності та доставки."}</p>
       ${b.stock>0?`
       <div class="qty-row">
