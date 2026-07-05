@@ -637,7 +637,7 @@ async function loadBooks(){
       name:b.name||b.Назва||"",
       author:b.author||b.Автор||"",
       price:Number(b.price||b.Ціна)||0,
-      oldPrice:b.oldPrice||b["Стара ціна"]||"",
+      oldPrice:b.oldPrice||b["Знижка"]||"",
       category:b.category||b.Жанр||"Інше",
       cover:toDirectImageUrl(b.cover||b.Обкладинка||""),
       badge:b.badge||b.Статус||"",
