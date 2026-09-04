@@ -494,7 +494,7 @@
           <input type="tel" id="f-phone" placeholder="+380 ...">
         </div>
         <div class="field" id="f-contact-field">
-          <label id="f-contact-label">Нікнейм у Telegram (необов'язково)</label>
+          <label id="f-contact-label">Юзернейм або посилання (необов'язково)</label>
           <input type="text" id="f-contact" placeholder="Юзернейм або посилання на акаунт">
           <p class="field-hint-warning" id="f-contact-hint">Щоб менеджер міг одразу перейти у ваш акаунт і написати вам. Якщо не вказано або вказано невірно — менеджер зателефонує. Перевірте правильність написання!</p>
         </div>
@@ -1125,12 +1125,12 @@ function setSocialNetwork(network){
   const hint=document.getElementById('f-contact-hint');
   if(network==='Telegram'){
     field.style.display='';
-    label.textContent="Нікнейм у Telegram (необов'язково)";
+    label.textContent="Юзернейм або посилання (необов'язково)";
     input.placeholder="Юзернейм або посилання на акаунт";
     hint.textContent="Щоб менеджер міг одразу перейти у ваш акаунт і написати вам. Якщо не вказано або вказано невірно — менеджер зателефонує. Перевірте правильність написання!";
   }else if(network==='Instagram'){
     field.style.display='';
-    label.textContent="Нікнейм у Instagram (необов'язково)";
+    label.textContent="Юзернейм або посилання (необов'язково)";
     input.placeholder="Юзернейм або посилання на акаунт";
     hint.textContent="Щоб менеджер міг одразу перейти у ваш акаунт і написати вам. Якщо не вказано або вказано невірно — менеджер зателефонує. Перевірте правильність написання!";
   }else{
